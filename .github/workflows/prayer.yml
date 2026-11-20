@@ -1,0 +1,35 @@
+name: Prayer reminders
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: prayer
+  cancel-in-progress: false
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore sent-reminders state
+        uses: actions/cache/restore@v4
+        with:
+          path: state.json
+          key: prayer-state-${{ github.run_id }}
+          restore-keys: prayer-state-
+      - name: Send due reminders
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          STATE_FILE: state.json
+        run: python3 prayer.py
+      - name: Save state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state.json
+          key: prayer-state-${{ github.run_id }}
