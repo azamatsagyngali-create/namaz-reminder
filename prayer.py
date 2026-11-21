@@ -11,7 +11,7 @@ state file so nothing is sent twice even if a scheduled run is late.
 Environment: BOT_TOKEN, CHAT_ID (required); LAT, LNG (default: Astana);
 STATE_FILE (default: state.json next to this script).
 """
-import json, os, sys, urllib.request
+import json, os, sys, urllib.error, urllib.parse, urllib.request
 from datetime import datetime, timedelta, timezone
 
 TZ = timezone(timedelta(hours=5))  # Kazakhstan
@@ -37,7 +37,7 @@ def today_times(now):
         try:
             data = get_json(url)
         except Exception as e:  # try the next source
-            print("source failed:", url, e)
+            print(f"::warning::prayer source failed: {urllib.parse.urlsplit(url).hostname}: {type(e).__name__}: {e}")
             continue
         for row in data.get("result") or []:
             if (row.get("Date") or row.get("date")) == day:
@@ -93,4 +93,23 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        for var in ("BOT_TOKEN", "CHAT_ID"):
+            if not os.environ.get(var):
+                raise RuntimeError(f"secret {var} is empty or missing")
+        main()
+    except urllib.error.HTTPError as e:
+        try:
+            detail = json.load(e).get("description", "")
+        except Exception:
+            detail = ""
+        host = urllib.parse.urlsplit(e.url or "").hostname
+        print(f"::error::HTTP {e.code} from {host}: {detail}")
+        sys.exit(1)
+    except SystemExit as e:
+        if e.code not in (0, None):
+            print(f"::error::{e.code}")
+        raise
+    except Exception as e:
+        print(f"::error::{type(e).__name__}: {e}")
+        sys.exit(1)
