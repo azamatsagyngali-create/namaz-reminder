@@ -65,6 +65,10 @@ def main():
     if state.get("day") != day:
         state = {"day": day, "sent": []}
     times = today_times(now)
+    if os.environ.get("TEST"):
+        lines = [f"{name}: {times.get(key, '-')}" for key, name in PRAYERS]
+        send("Намаз еске салу жұмыс істеп тұр. Бүгінгі уақыттар (Астана):\n" + "\n".join(lines))
+        print("test message sent")
     for key, name in PRAYERS:
         hhmm = times.get(key)
         if not hhmm:
