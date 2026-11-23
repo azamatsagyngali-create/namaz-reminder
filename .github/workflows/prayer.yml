@@ -1,23 +1,28 @@
 name: Prayer reminders
 
+# GitHub starts scheduled runs irregularly (often 40-90 minutes apart), so each
+# run stays alive for about 5.5 hours and checks the clock every 30 seconds.
+# The hourly schedule keeps one run waiting in the queue: it starts as soon as
+# the current one ends, so there is no gap.
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "7 * * * *"
   workflow_dispatch:
     inputs:
       test:
-        description: "Send a test message now"
+        description: "Send a test message now (does not start the long check)"
         type: boolean
         default: true
 
 concurrency:
-  group: prayer
+  # manual test runs get their own group, so they never wait behind the long run
+  group: prayer-${{ github.event_name == 'workflow_dispatch' && inputs.test && 'test' || 'main' }}
   cancel-in-progress: false
 
 jobs:
   remind:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 345
     steps:
       - uses: actions/checkout@v4
       - name: Restore sent-reminders state
@@ -26,13 +31,13 @@ jobs:
           path: state.json
           key: prayer-state-${{ github.run_id }}
           restore-keys: prayer-state-
-      - name: Send due reminders
+      - name: Send reminders (loop)
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
           STATE_FILE: state.json
           TEST: ${{ inputs.test && '1' || '' }}
-        run: python3 prayer.py
+        run: python3 prayer.py --loop 330
       - name: Save state
         if: always()
         uses: actions/cache/save@v4
